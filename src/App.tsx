@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import './App.css'
+import { getThreeYearPopularity, getThreeYearRank, POPULARITY_SOURCE } from './data/threeYearPopularity'
 import { loadDataset } from './lib/tauriDataset'
 import { makeDefaultInput, recommendNames } from './lib/namingEngine'
 import type { NameCandidate, NameDataset, NameStyle, NamingInput, RecommendationResult } from './types'
@@ -270,12 +271,44 @@ function App() {
             </div>
 
             <article className="report-surface">
+              <PopularityPanel gender={input.gender} selectedName={selected?.hangul ?? ''} />
               {selected ? <CandidateReport candidate={selected} result={result} /> : <EmptyState />}
             </article>
           </div>
         </section>
       </section>
     </main>
+  )
+}
+
+function PopularityPanel({ gender, selectedName }: { gender: NamingInput['gender']; selectedName: string }) {
+  const rows = getThreeYearPopularity(gender)
+  const selectedRank = selectedName ? getThreeYearRank(selectedName, gender) : undefined
+
+  return (
+    <section className="popularity-panel" aria-label="최근 3년 인기 이름">
+      <div className="popularity-heading">
+        <div>
+          <p className="eyebrow">{POPULARITY_SOURCE.range} 합산</p>
+          <h3>{genderLabel(gender)} 인기 이름 TOP 10</h3>
+        </div>
+        {selectedRank && <span className="rank-badge">현재 후보 {selectedRank.rank}위</span>}
+      </div>
+      <div className="popularity-table">
+        {rows.map((row) => (
+          <div className={row.name === selectedName ? 'popularity-row selected' : 'popularity-row'} key={row.name}>
+            <b>{row.rank}</b>
+            <strong>{row.name}</strong>
+            <span>{row.count.toLocaleString()}명</span>
+            <small>
+              23년 {row.years[2023].toLocaleString()} · 24년 {row.years[2024].toLocaleString()} · 25년{' '}
+              {row.years[2025].toLocaleString()}
+            </small>
+          </div>
+        ))}
+      </div>
+      <p className="source-note">{POPULARITY_SOURCE.label} 참고. 공개 집계 시점에 따라 소폭 달라질 수 있습니다.</p>
+    </section>
   )
 }
 
@@ -376,6 +409,12 @@ function pillarLabel(key: string): string {
     hour: '시주',
   }
   return labels[key] ?? key
+}
+
+function genderLabel(gender: NamingInput['gender']): string {
+  if (gender === 'male') return '남아'
+  if (gender === 'female') return '여아'
+  return '전체'
 }
 
 function formatBirth(result: RecommendationResult): string {
