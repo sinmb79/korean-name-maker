@@ -1,0 +1,45 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm run test
+
+      - name: Build Tauri app
+        run: npm run tauri:build
+
+      - name: Create portable zip
+        shell: powershell
+        run: |
+          $exe = Get-ChildItem src-tauri/target/release -Filter *.exe | Select-Object -First 1
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          Copy-Item $exe.FullName artifacts/
+          Compress-Archive -Path artifacts/* -DestinationPath artifacts/Portable-x64.zip -Force
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: korean-name-maker-windows
+          path: |
+            src-tauri/target/release/bundle/**/*.exe
+            artifacts/Portable-x64.zip

@@ -1,0 +1,44 @@
+:root {
+  --bg: #f3f1ea;
+  --surface: #ffffff;
+  --ink: #22211f;
+  --muted: #6f6a60;
+  --line: #e2ded3;
+  font-family:
+    "Segoe UI",
+    "Malgun Gothic",
+    system-ui,
+    sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  font-size: 15px;
+  line-height: 1.45;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100svh;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  letter-spacing: 0;
+}
+
+#root {
+  min-height: 100svh;
+}
