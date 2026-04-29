@@ -120,6 +120,14 @@ function App() {
               </select>
             </label>
             <label>
+              아버지 이름
+              <input value={input.fatherName} onChange={(event) => updateInput('fatherName', event.target.value)} />
+            </label>
+            <label>
+              어머니 이름
+              <input value={input.motherName} onChange={(event) => updateInput('motherName', event.target.value)} />
+            </label>
+            <label>
               태어난 년월일
               <input type="date" value={input.birthDate} onChange={(event) => updateInput('birthDate', event.target.value)} />
             </label>
@@ -198,6 +206,7 @@ function App() {
           </button>
 
           <p className="legal-note">사주명리 계산은 작명 참고용입니다. 출생신고 전 한자는 대법원 조회로 최종 확인해야 합니다.</p>
+          <p className="legal-note">부모 이름은 선택 입력입니다. 입력하면 가족 이름과의 글자 겹침만 참고 점수로 봅니다.</p>
         </aside>
 
         <section className="result-panel" aria-label="추천 결과">
@@ -427,10 +436,13 @@ function formatCandidateReport(candidate: NameCandidate, result: RecommendationR
   const sajuLines = result
     ? [
         `출생: ${formatBirth(result)}`,
+        result.input.fatherName || result.input.motherName
+          ? `부모 이름: ${result.input.fatherName || '미입력'} / ${result.input.motherName || '미입력'}`
+          : '',
         `사주팔자: ${result.saju.eightLetters}`,
         `일간: ${result.saju.dayMaster.label}`,
         `보완 오행: ${result.saju.neededElements.join(', ')}`,
-      ]
+      ].filter(Boolean)
     : []
 
   return [

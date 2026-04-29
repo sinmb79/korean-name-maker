@@ -19,6 +19,13 @@ import type {
 
 export const defaultDataset = seedData as NameDataset
 
+interface ParentNameHarmony {
+  hasParentInput: boolean
+  score: number
+  strengths: string[]
+  cautions: string[]
+}
+
 const ELEMENTS: FiveElement[] = ['목', '화', '토', '금', '수']
 const STEMS = ['갑', '을', '병', '정', '무', '기', '경', '신', '임', '계']
 const STEM_ELEMENTS: FiveElement[] = ['목', '목', '화', '화', '토', '토', '금', '금', '수', '수']
@@ -124,6 +131,8 @@ const MONTH_BOUNDARIES = [
 export function makeDefaultInput(): NamingInput {
   return {
     familyName: '김',
+    fatherName: '',
+    motherName: '',
     gender: 'female',
     birthDate: '2026-04-29',
     birthTime: '09:30:00',
@@ -226,6 +235,8 @@ function normalizeInput(input: NamingInput): NamingInput {
   return {
     ...input,
     familyName: input.familyName.trim().slice(0, 2) || '김',
+    fatherName: input.fatherName.trim().replace(/\s+/g, ''),
+    motherName: input.motherName.trim().replace(/\s+/g, ''),
     birthTime: normalizeBirthTime(input.birthTime),
     generationChar: input.generationChar.trim().slice(0, 1),
     preferredChars: input.preferredChars.trim(),
@@ -423,6 +434,7 @@ function buildCandidate(
   const selectedHanja = hanja as HanjaChar[]
   const numerology = calculateNumerology(input.familyName, selectedHanja, dataset.scoringRules)
   const badWordWarnings = findBadWordWarnings(`${input.familyName}${hangul}`, dataset)
+  const parentHarmony = analyzeParentNameHarmony(hangul, input)
   const scoreBreakdown = calculateScoreBreakdown(
     hangul,
     selectedHanja,
@@ -431,14 +443,15 @@ function buildCandidate(
     numerology,
     dataset,
     badWordWarnings.length,
+    parentHarmony,
   )
   const totalScore = clampScore(
     Object.values(scoreBreakdown).reduce((sum, score) => sum + score, 0),
   )
   const popularity = getPopularityLabel(hangul, input.gender, dataset)
   const soundReference = describeSoundReference(hangul, saju.neededElements)
-  const strengths = buildStrengths(selectedHanja, saju, numerology, popularity, scoreBreakdown)
-  const cautions = buildCautions(badWordWarnings, numerology, popularity, soundReference, saju)
+  const strengths = buildStrengths(selectedHanja, saju, numerology, popularity, scoreBreakdown, parentHarmony)
+  const cautions = buildCautions(badWordWarnings, numerology, popularity, soundReference, saju, parentHarmony)
 
   return {
     id: `${hangul}-${selectedHanja.map((entry) => entry.char).join('')}`,
@@ -525,6 +538,7 @@ function calculateScoreBreakdown(
   numerology: NumerologyResult,
   dataset: NameDataset,
   badWordCount: number,
+  parentHarmony: ParentNameHarmony,
 ): Record<keyof ScoringRules['weights'], number> {
   const weights = dataset.scoringRules.weights
   const hanjaElements = hanja.map((entry) => entry.element)
@@ -539,7 +553,7 @@ function calculateScoreBreakdown(
   const yinYangScore = calculateYinYangScore(numerology.originalNameStrokes, weights.yinYang)
   const soundScore = calculateSoundScore(hangul, saju.neededElements, weights.soundReference)
   const modernityScore = calculateModernityScore(hangul, input.gender, dataset, badWordCount, weights.modernity)
-  const preferenceScore = calculatePreferenceScore(hangul, input, weights.preference)
+  const preferenceScore = calculatePreferenceScore(hangul, input, weights.preference, parentHarmony)
 
   return {
     saju: roundScore(sajuScore),
@@ -579,11 +593,16 @@ function calculateModernityScore(
   return maxScore * rankScore * badWordPenalty * pronunciationScore
 }
 
-function calculatePreferenceScore(hangul: string, input: NamingInput, maxScore: number): number {
+function calculatePreferenceScore(
+  hangul: string,
+  input: NamingInput,
+  maxScore: number,
+  parentHarmony: ParentNameHarmony,
+): number {
   const preferred = [...input.preferredChars].filter((letter) => hangul.includes(letter)).length
   const generation = input.generationChar && hangul.includes(input.generationChar) ? 1 : 0
   const styleBonus = input.styles.length > 0 ? 0.35 : 0
-  return Math.min(maxScore, (preferred + generation) * 3 + styleBonus * maxScore + 3)
+  return Math.max(0, Math.min(maxScore, (preferred + generation) * 3 + styleBonus * maxScore + 3 + parentHarmony.score))
 }
 
 function findBadWordWarnings(fullName: string, dataset: NameDataset): string[] {
@@ -617,6 +636,7 @@ function buildStrengths(
   numerology: NumerologyResult,
   popularity: string,
   scoreBreakdown: Record<keyof ScoringRules['weights'], number>,
+  parentHarmony: ParentNameHarmony,
 ): string[] {
   const strengths = [
     `사주팔자: ${saju.eightLetters}, 일간 ${saju.dayMaster.label}`,
@@ -628,6 +648,7 @@ function buildStrengths(
 
   if (scoreBreakdown.saju >= 14) strengths.push('부족 오행 보완 점수가 높습니다.')
   if (scoreBreakdown.modernity >= 16) strengths.push('현대 어감 점수가 안정적입니다.')
+  strengths.push(...parentHarmony.strengths)
   return strengths
 }
 
@@ -637,13 +658,85 @@ function buildCautions(
   popularity: string,
   soundReference: string,
   saju: SajuAnalysis,
+  parentHarmony: ParentNameHarmony,
 ): string[] {
   const cautions = [...badWordWarnings]
   if (saju.strongElements.length > 0) cautions.push(`과다 오행(${saju.strongElements.join(', ')})은 이름에서 과하게 더하지 않는 편이 좋습니다.`)
   if (numerology.goodCount < 2) cautions.push('수리사격 길격 수가 낮아 재검토가 좋습니다.')
   if (popularity.includes('매우')) cautions.push('흔한 이름을 피하고 싶다면 후순위 후보도 보십시오.')
+  cautions.push(...parentHarmony.cautions)
   cautions.push(soundReference)
   return cautions
+}
+
+function analyzeParentNameHarmony(hangul: string, input: NamingInput): ParentNameHarmony {
+  const parentNames = [input.fatherName, input.motherName].filter(Boolean)
+  if (parentNames.length === 0) {
+    return {
+      hasParentInput: false,
+      score: 0,
+      strengths: [],
+      cautions: [],
+    }
+  }
+
+  const fullChildName = `${input.familyName}${hangul}`
+  const parentGivenNames = parentNames.map((name) => stripFamilyName(name, input.familyName))
+  const overlappingLetters = new Set<string>()
+  parentGivenNames.forEach((name) => {
+    ;[...hangul].forEach((letter) => {
+      if (name.includes(letter)) overlappingLetters.add(letter)
+    })
+  })
+
+  const hasSameFullName = parentNames.some((name) => name === fullChildName)
+  const hasSameGivenName = parentGivenNames.some((name) => name === hangul)
+  const cautions: string[] = []
+  const strengths: string[] = []
+
+  if (hasSameFullName || hasSameGivenName) {
+    cautions.push('부모 이름과 같은 이름이어서 가족 내 호칭 혼동 가능성이 큽니다.')
+    return {
+      hasParentInput: true,
+      score: -3,
+      strengths,
+      cautions,
+    }
+  }
+
+  if (overlappingLetters.size >= 2) {
+    cautions.push(`부모 이름과 겹치는 글자(${[...overlappingLetters].join(', ')})가 많아 재검토가 좋습니다.`)
+    return {
+      hasParentInput: true,
+      score: -1.5,
+      strengths,
+      cautions,
+    }
+  }
+
+  if (overlappingLetters.size === 1) {
+    cautions.push(`부모 이름과 '${[...overlappingLetters][0]}' 글자가 겹칩니다. 의도한 가족 조화인지 확인하십시오.`)
+    return {
+      hasParentInput: true,
+      score: 0,
+      strengths,
+      cautions,
+    }
+  }
+
+  strengths.push('부모 이름과 글자 겹침이 적어 가족 내 구분성이 좋습니다.')
+  return {
+    hasParentInput: true,
+    score: 1.5,
+    strengths,
+    cautions,
+  }
+}
+
+function stripFamilyName(name: string, familyName: string): string {
+  if (familyName && name.startsWith(familyName)) return name.slice(familyName.length)
+  if (name.length >= 3) return name.slice(1)
+  return name
 }
 
 function getInitialConsonant(letter: string): string {

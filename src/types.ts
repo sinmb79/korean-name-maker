@@ -66,6 +66,8 @@ export interface NameDataset {
 
 export interface NamingInput {
   familyName: string
+  fatherName: string
+  motherName: string
   gender: Gender
   birthDate: string
   birthTime: string
