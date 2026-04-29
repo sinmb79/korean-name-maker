@@ -210,6 +210,7 @@ button:focus-visible {
   cursor: pointer;
 }
 
+.pillar-strip,
 .saju-strip {
   display: grid;
   grid-template-columns: repeat(6, minmax(74px, 1fr));
@@ -218,6 +219,11 @@ button:focus-visible {
   border-bottom: 1px solid var(--line);
 }
 
+.pillar-strip {
+  grid-template-columns: repeat(5, minmax(104px, 1fr));
+}
+
+.pillar-strip div,
 .saju-strip div {
   min-height: 58px;
   display: flex;
@@ -228,15 +234,24 @@ button:focus-visible {
   background: #fff;
 }
 
+.pillar-strip span,
 .saju-strip span {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
 }
 
+.pillar-strip strong,
 .saju-strip strong {
   color: var(--ink);
   font-size: 18px;
+}
+
+.pillar-strip small,
+.saju-strip small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .saju-strip .needed strong {
@@ -355,6 +370,10 @@ button:focus-visible {
   line-height: 1.65;
 }
 
+.saju-summary strong {
+  color: #116a72;
+}
+
 .two-column {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -431,6 +450,10 @@ ul {
 
   .saju-strip {
     grid-template-columns: repeat(3, minmax(74px, 1fr));
+  }
+
+  .pillar-strip {
+    grid-template-columns: repeat(2, minmax(104px, 1fr));
   }
 
   .score-band {

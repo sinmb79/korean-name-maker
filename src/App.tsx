@@ -31,11 +31,13 @@ function App() {
 
   useEffect(() => {
     loadDataset().then((loaded) => {
+      const defaultInput = makeDefaultInput()
+      const firstResult = recommendNames(defaultInput, loaded)
       setDataset(loaded)
-      const firstResult = recommendNames(makeDefaultInput(), loaded)
+      setInput(defaultInput)
       setResult(firstResult)
       setSelectedId(firstResult.candidates[0]?.id ?? '')
-      setStatus('오프라인 데이터 사용 중')
+      setStatus('사주명리 계산 준비 완료')
     })
   }, [])
 
@@ -61,34 +63,34 @@ function App() {
     const next = recommendNames(input, dataset)
     setResult(next)
     setSelectedId(next.candidates[0]?.id ?? '')
-    setStatus(`${next.candidates.length}개 후보 계산 완료`)
+    setStatus(`${next.saju.eightLetters} 기준 ${next.candidates.length}개 후보 계산 완료`)
   }
 
   async function copySelected(candidate: NameCandidate | null) {
     if (!candidate) return
-    const text = formatCandidateReport(candidate)
+    const text = formatCandidateReport(candidate, result)
     await navigator.clipboard?.writeText(text)
     setStatus('후보 이름을 복사했습니다')
   }
 
   function saveSelected(candidate: NameCandidate | null) {
     if (!candidate) return
-    const blob = new Blob([formatCandidateReport(candidate)], { type: 'text/plain;charset=utf-8' })
+    const blob = new Blob([formatCandidateReport(candidate, result)], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `${candidate.fullHangul}_작명리포트.txt`
+    link.download = `${candidate.fullHangul}_사주작명리포트.txt`
     link.click()
     URL.revokeObjectURL(url)
-    setStatus('리포트 파일을 만들었습니다')
+    setStatus('사주 작명 리포트 파일을 만들었습니다')
   }
 
   return (
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">무료 공개용 v1</p>
-          <h1>작명 도우미</h1>
+          <p className="eyebrow">년월일시분초 기반 v1</p>
+          <h1>사주 작명 도우미</h1>
         </div>
         <div className="status-pill">
           <ShieldCheck size={17} aria-hidden="true" />
@@ -100,7 +102,7 @@ function App() {
         <aside className="input-panel" aria-label="작명 조건">
           <div className="panel-heading">
             <Sparkles size={20} aria-hidden="true" />
-            <h2>조건</h2>
+            <h2>태어난 정보</h2>
           </div>
 
           <div className="field-grid">
@@ -117,12 +119,17 @@ function App() {
               </select>
             </label>
             <label>
-              생년월일
+              태어난 년월일
               <input type="date" value={input.birthDate} onChange={(event) => updateInput('birthDate', event.target.value)} />
             </label>
             <label>
-              출생시
-              <input type="time" value={input.birthTime} onChange={(event) => updateInput('birthTime', event.target.value)} />
+              태어난 시분초
+              <input
+                type="time"
+                step={1}
+                value={input.birthTime}
+                onChange={(event) => updateInput('birthTime', event.target.value)}
+              />
             </label>
             <label>
               달력
@@ -135,7 +142,14 @@ function App() {
               </select>
             </label>
             <label>
-              글자 수
+              시간대
+              <select value={input.timezone} onChange={(event) => updateInput('timezone', event.target.value)}>
+                <option value="Asia/Seoul">한국 표준시</option>
+                <option value="UTC">UTC</option>
+              </select>
+            </label>
+            <label>
+              이름 글자 수
               <select value={input.nameLength} onChange={(event) => updateInput('nameLength', Number(event.target.value) as 2 | 3)}>
                 <option value={2}>2자</option>
                 <option value={3}>3자</option>
@@ -146,7 +160,7 @@ function App() {
               <input value={input.generationChar} maxLength={1} onChange={(event) => updateInput('generationChar', event.target.value)} />
             </label>
             <label>
-              위치
+              돌림자 위치
               <select
                 value={input.generationPosition}
                 onChange={(event) => updateInput('generationPosition', event.target.value as NamingInput['generationPosition'])}
@@ -179,10 +193,10 @@ function App() {
 
           <button className="primary-action" type="button" onClick={runRecommendation} disabled={!dataset}>
             <Search size={18} aria-hidden="true" />
-            추천 계산
+            사주 기반 작명
           </button>
 
-          <p className="legal-note">대법원 인명용 한자 기준으로 필터링하며, 운명 보장이 아닌 참고용입니다.</p>
+          <p className="legal-note">사주명리 계산은 작명 참고용입니다. 출생신고 전 한자는 대법원 조회로 최종 확인해야 합니다.</p>
         </aside>
 
         <section className="result-panel" aria-label="추천 결과">
@@ -205,18 +219,36 @@ function App() {
           </div>
 
           {result && (
-            <div className="saju-strip">
-              {Object.entries(result.saju.elementCounts).map(([element, count]) => (
-                <div key={element}>
-                  <span>{element}</span>
-                  <strong>{count}</strong>
+            <>
+              <div className="pillar-strip">
+                {Object.entries(result.saju.pillars).map(([key, pillar]) => (
+                  <div key={key}>
+                    <span>{pillarLabel(key)}</span>
+                    <strong>{pillar.stem}{pillar.branch}</strong>
+                    <small>{pillar.stemElement}/{pillar.branchElement}</small>
+                  </div>
+                ))}
+                <div>
+                  <span>일간</span>
+                  <strong>{result.saju.dayMaster.label}</strong>
+                  <small>계절 {result.saju.seasonElement}</small>
                 </div>
-              ))}
-              <div className="needed">
-                <span>보완</span>
-                <strong>{result.saju.neededElements.join(', ')}</strong>
               </div>
-            </div>
+
+              <div className="saju-strip">
+                {Object.entries(result.saju.elementBalance).map(([element, balance]) => (
+                  <div key={element}>
+                    <span>{element} {balance.grade}</span>
+                    <strong>{balance.count}</strong>
+                    <small>{balance.percent}%</small>
+                  </div>
+                ))}
+                <div className="needed">
+                  <span>보완 오행</span>
+                  <strong>{result.saju.neededElements.join(', ')}</strong>
+                </div>
+              </div>
+            </>
           )}
 
           <div className="content-grid">
@@ -238,7 +270,7 @@ function App() {
             </div>
 
             <article className="report-surface">
-              {selected ? <CandidateReport candidate={selected} /> : <EmptyState />}
+              {selected ? <CandidateReport candidate={selected} result={result} /> : <EmptyState />}
             </article>
           </div>
         </section>
@@ -247,9 +279,20 @@ function App() {
   )
 }
 
-function CandidateReport({ candidate }: { candidate: NameCandidate }) {
+function CandidateReport({ candidate, result }: { candidate: NameCandidate; result: RecommendationResult | null }) {
   return (
     <>
+      {result && (
+        <section className="report-section saju-summary">
+          <h3>사주명리 요약</h3>
+          <p>
+            {formatBirth(result)} 출생 기준 사주팔자는 <strong>{result.saju.eightLetters}</strong>입니다.
+            일간은 <strong>{result.saju.dayMaster.label}</strong>이며, 이름에서는{' '}
+            <strong>{result.saju.neededElements.join(', ')}</strong> 기운을 우선 보완합니다.
+          </p>
+        </section>
+      )}
+
       <div className="score-band">
         <div>
           <span>종합점수</span>
@@ -325,9 +368,35 @@ function scoreLabel(key: string): string {
   return labels[key] ?? key
 }
 
-function formatCandidateReport(candidate: NameCandidate): string {
+function pillarLabel(key: string): string {
+  const labels: Record<string, string> = {
+    year: '년주',
+    month: '월주',
+    day: '일주',
+    hour: '시주',
+  }
+  return labels[key] ?? key
+}
+
+function formatBirth(result: RecommendationResult): string {
+  const { birth } = result.saju
+  const time = [birth.hour, birth.minute, birth.second].map((value) => String(value).padStart(2, '0')).join(':')
+  return `${birth.year}년 ${birth.month}월 ${birth.day}일 ${time}`
+}
+
+function formatCandidateReport(candidate: NameCandidate, result: RecommendationResult | null): string {
+  const sajuLines = result
+    ? [
+        `출생: ${formatBirth(result)}`,
+        `사주팔자: ${result.saju.eightLetters}`,
+        `일간: ${result.saju.dayMaster.label}`,
+        `보완 오행: ${result.saju.neededElements.join(', ')}`,
+      ]
+    : []
+
   return [
     `${candidate.fullHangul} (${candidate.hanjaText})`,
+    ...sajuLines,
     `점수: ${candidate.totalScore}`,
     `뜻: ${candidate.meanings}`,
     `인기: ${candidate.popularityLabel}`,

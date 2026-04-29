@@ -1,4 +1,5 @@
 export type FiveElement = '목' | '화' | '토' | '금' | '수'
+export type YinYang = '양' | '음'
 export type Gender = 'male' | 'female' | 'neutral'
 export type CalendarType = 'solar' | 'lunar'
 export type NameStyle = 'modern' | 'classic' | 'soft' | 'strong' | 'bright'
@@ -78,21 +79,49 @@ export interface NamingInput {
   styles: NameStyle[]
 }
 
+export interface BirthDateTime {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+  second: number
+}
+
 export interface Pillar {
   stem: string
   branch: string
-  element: FiveElement
+  stemElement: FiveElement
+  branchElement: FiveElement
+  yinYang: YinYang
+}
+
+export interface ElementBalance {
+  count: number
+  percent: number
+  grade: '부족' | '보통' | '과다'
 }
 
 export interface SajuAnalysis {
+  birth: BirthDateTime
   pillars: {
     year: Pillar
     month: Pillar
     day: Pillar
     hour: Pillar
   }
+  eightLetters: string
+  dayMaster: {
+    stem: string
+    element: FiveElement
+    yinYang: YinYang
+    label: string
+  }
   elementCounts: Record<FiveElement, number>
+  elementBalance: Record<FiveElement, ElementBalance>
   neededElements: FiveElement[]
+  strongElements: FiveElement[]
+  seasonElement: FiveElement
   notes: string[]
 }
 
